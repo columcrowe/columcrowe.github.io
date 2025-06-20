@@ -1,39 +1,11 @@
 ---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
 const pageTitle = "My Bike Shed";
-const identity = {
-  firstName: "Colum",
-  country: "Ireland",
-  occupation: "Engineer",
-};
-
-const skills = ["Python", "C/C++", "Matlab"];
 ---
+<BaseLayout pageTitle={pageTitle}>
+  <h1>Under construction</h1>
+  <h2>Work in progress...</h2>
+  <img src="https://raw.githubusercontent.com/columcrowe/columcrowe.github.io/refs/heads/main/src/assets/WIP.gif" alt="wip" width="300" height="200" />
+</BaseLayout>
 
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width" />
-    <title>Home</title>
-    <title>{pageTitle}</title>
-  </head>
-  <body>
-    <a href="/">Home</a>
-    <a href="/about/">About</a>
-    <h1>{pageTitle}</h1>
-	
-	<!--
-	<ul>
-    <li>My name is {identity.firstName}.</li>
-    <li>I live in {identity.country} and I work as a {identity.occupation}.</li>
-    </ul>
-    <p>My skills are:</p>
-    <ul>
-    {skills.map((skill) => <li>{skill}</li>)}
-    </ul>
-    -->
-	
-    <h1>Work in progress</h1>
-    <h2>Under construction...</h2>
-	<img src="https://raw.githubusercontent.com/columcrowe/columcrowe.github.io/refs/heads/main/src/assets/WIP.gif" alt="wip" width="300" height="200" />
-
-</body>

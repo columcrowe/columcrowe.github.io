@@ -1,4 +1,9 @@
-<body>
-  <a href="/">Home</a>
-  <a href="/about/">About</a>
-</body>
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const pageTitle = "Index";
+---
+<BaseLayout pageTitle={pageTitle}>
+  <h1></h1>
+  <h2></h2>
+</BaseLayout>
