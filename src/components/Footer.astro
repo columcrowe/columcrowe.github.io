@@ -3,16 +3,12 @@ import Social from './Social.astro';
 
 const now = new Date();
 ---
-<style>
-  footer {
-    display: flex;
-    gap: 1rem;
-    margin-top: 2rem;
-  }
-</style>
+
 <footer>
-  Colum Crowe | 
-  <Social platform="linkedin" username="in/colum-crowe" /> | 
-  <Social platform="github" username="columcrowe" /> | 
-  {now.getFullYear()}
+  <code>
+    Colum Crowe | 
+    © {now.getFullYear()} |
+    <Social platform="Linkedin" username="in/colum-crowe" /> |
+    <Social platform="Github" username="columcrowe" />
+  </code>
 </footer>

@@ -1,35 +1,18 @@
 ---
-import '../styles/global.css';
-import Footer from '../components/Footer.astro';
-import Header from '../components/Header.astro';
+import BaseLayout from '../layouts/BaseLayout.astro';
 
 const wikiUrl = "https://en.wikipedia.org/wiki/Law_of_triviality";
 const linkedInUrl = "https://www.linkedin.com/in/colum-crowe/"
 const pageTitle = "My Bike Shed"
 ---
 
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width" />
-    <title>{pageTitle}</title>
-  </head>
-  <body>
-    <Header />
-	<a href={wikiUrl} target="_blank" rel="noopener noreferrer">
-      <h1>{pageTitle}</h1>
-    </a>
+<BaseLayout>
+  <main>
+    <h1><a href={wikiUrl}>{pageTitle}</a></h1>
 	You've reached the digital attic where I <a href={linkedInUrl}>(linkedin.com/in/colum-crowe)</a> dump stuff onto the web.<br>
     Here's where I overthink all the <em>little things</em> I enjoy.<br>
     <h1>Under construction</h1>
     <h2>Work in progress...</h2>
     <img src="https://raw.githubusercontent.com/columcrowe/columcrowe.github.io/refs/heads/main/src/assets/WIP.gif" alt="wip" width="300" height="200" />
-    <Footer />
-    <script>
-      import "../scripts/menu.js";
-    </script>
-  </body>
-</html>
-
-
-
+  </main>
+</BaseLayout>
