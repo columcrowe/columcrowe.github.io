@@ -1,9 +1,9 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import { SITE_TITLE, SITE_DESCRIPTION } from '../../consts';
+import { SITE_NAME, SITE_DESCRIPTION } from '../../consts';
 import { getCollection } from 'astro:content';
 
-const posts = (await getCollection('posts')).sort(
+const notes = (await getCollection('notes')).sort(
 	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
 );
 ---
@@ -13,15 +13,15 @@ const posts = (await getCollection('posts')).sort(
 	description={SITE_DESCRIPTION}
 >
 	<section>
-		<ul class="flex flex-col gap-1.5">
+		<ul class="flex flex-col gap-2">
 			{
-				posts.map((post) => (
+				notes.map((note) => (
 					<li>
 						<a 
-						  href={`/posts/${post.id}/`} 
-						  class="group flex justify-between gap-3"
+						  href={`/notes/${note.id}/`} 
+						  class="group flex justify-between gap-2"
 						>	
-						  {post.data.title}
+						  {note.data.title}
 						</a>
 					</li>
 				))

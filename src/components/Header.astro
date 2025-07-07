@@ -1,16 +1,12 @@
 ---
 import ThemeIcon from "./ThemeIcon.astro";
-import FaviconIcon from "./FaviconIcon.astro";
 ---
 
 <header>
 	<nav>
-	    <div class="lofty-perch">
-		  <FaviconIcon />
-		</div>
 		<div class="internal-links">
 			<a href="/">Home</a>
-			<a href="/posts">Posts</a>
+			<a href="/notes">Notes</a>
 			<a href="/about">About</a>
 		</div>
 		<div class="social-links">
@@ -36,15 +32,6 @@ import FaviconIcon from "./FaviconIcon.astro";
 		padding: 0 1em;
 		background: var(--bg);
 	}
-	h2 {
-		margin: 0;
-		font-size: 1em;
-	}
-
-	h2 a,
-	h2 a.active {
-		text-decoration: none;
-	}
 	nav {
 		display: flex;
 		align-items: center;
@@ -60,11 +47,6 @@ import FaviconIcon from "./FaviconIcon.astro";
 		text-decoration: none;
 		border-bottom-color: var(--accent);
 	}
-	.lofty-perch {
-		position: absolute;
-		top: 1rem;
-		left: 1rem;
-	}
 	.internal-links {
 		position: absolute;
 		left: 50%;
@@ -77,6 +59,7 @@ import FaviconIcon from "./FaviconIcon.astro";
 		display: flex;
 		text-decoration: none;
 		color: var(--link);
+		transition: color 0.3s ease;
 	}
 	.internal-links a:hover {
 		color: var(--accent);
@@ -99,9 +82,6 @@ import FaviconIcon from "./FaviconIcon.astro";
 	}
 	@media (max-width: 636px) {
 		.social-links {
-			display: none;
-		}
-		.lofty-perch {
 			display: none;
 		}
 	}
