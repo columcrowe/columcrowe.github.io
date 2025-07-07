@@ -1,26 +1,25 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro';
+import BaseLayout from './../layouts/BaseLayout.astro';
+import { SITE_NAME, SITE_DESCRIPTION } from './../consts';
+
 import WIP from '../assets/wip.webp';
 
 const wikiUrl = "https://en.wikipedia.org/wiki/Law_of_triviality";
 const linkedInUrl = "https://www.linkedin.com/in/colum-crowe/"
-const pageTitle = "My Bike Shed"
+const pageTitle = "Welcome"
 ---
 
+
 <BaseLayout
-	title=""
-	description=""
+	title={pageTitle}
+	description={SITE_DESCRIPTION}
 >
-	<h1><a href={wikiUrl}>{pageTitle}</a></h1>
-	<p>
-	You have reached the digital landfill where <a href={linkedInUrl}>colum-crowe</a> dumps stuff onto the web.<br>
-	</p>	
-	<h1>Under construction</h1>
-	<p>
-	<img src="https://raw.githubusercontent.com/columcrowe/columcrowe.github.io/refs/heads/main/src/assets/WIP.webp" alt="wip" width="300" height="200" />
-	<p>	
-	<h2>Work in progress...</h2>	
-	<p>
-	Here's where I overthink all the <em>little things</em> I enjoy.<br>
-	</p>
+	<section style="text-align: center">
+		<h3><a href={linkedInUrl}>Colum's</a> <a href={wikiUrl}>Bikeshed</a></h3><br>		 
+		This a small website where I occasionally write, and potentially some other things.<br>	
+		<h3>Under construction</h3>
+		<img src="https://raw.githubusercontent.com/columcrowe/columcrowe.github.io/refs/heads/main/src/assets/WIP.webp" alt="wip" width="300" height="200"></img>
+		<h3>Work in progress...</h3>
+	</section>
 </BaseLayout>
+

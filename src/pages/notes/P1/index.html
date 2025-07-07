@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive Patient Diary Visualization</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+  <style>
+    /* Constants for consistent styling */
+    :root {
+      --primary-bg: rgba(255, 255, 255, 0.95);
+      --secondary-bg: rgba(0, 0, 0, 0.95);
+      --text-primary: rgba(0, 0, 0, 0.95);
+      --transition-duration: 300ms;
+      --node-shadow: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+      --padding-large: 30px;
+      --padding-small: 15px;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .container {
+      margin: 0 auto;
+      padding: var(--padding-large);
+      background: var(--primary-bg);
+      max-width: 1400px;
+    }
+
+    h1 {
+      text-align: center;
+      color: var(--text-primary);
+      font-size: 2.5em;
+      margin-bottom: 10px;
+    }
+
+    .viz-container {
+      margin: 0 auto;
+      background: var(--primary-bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    svg {
+      background: var(--secondary-bg);
+      border-radius: 8px;
+    }
+
+    .tooltip {
+      position: absolute;
+      background: var(--primary-bg);
+      color: black;
+      display: none;
+      pointer-events: none;
+      padding: 8px 12px;
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      font-size: 14px;
+      z-index: 1000;
+      max-width: 250px;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      margin: 20px 0;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    #timeSlider {
+      cursor: pointer;
+      width: 400px;
+    }
+
+    #timeLabel {
+      font-weight: 500;
+      min-width: 120px;
+    }
+
+    #playButton {
+      cursor: pointer;
+      transition: all 0.3s ease;
+      padding: 8px 16px;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      min-width: 80px;
+    }
+
+    #playButton:hover {
+      transform: translateY(-2px);
+      background: #2980b9;
+    }
+
+    .stats {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    .stat-item {
+      text-align: center;
+      padding: 10px 20px;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .stat-number {
+      display: block;
+      font-size: 24px;
+      font-weight: bold;
+      color: #2c3e50;
+    }
+
+    .stat-label {
+      display: block;
+      font-size: 12px;
+      color: #7f8c8d;
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #7f8c8d;
+    }
+
+    .connection-line {
+      stroke: #bdc3c7;
+      stroke-width: 1;
+      stroke-opacity: 0.5;
+      stroke-dasharray: 2,2;
+    }
+
+    .time-info {
+      text-align: center;
+      margin: 10px 0;
+      color: #7f8c8d;
+      font-size: 14px;
+    }
+
+    /* Responsive design */
+    @media (max-width: 768px) {
+      .container { padding: var(--padding-small); }
+      h1 { font-size: 2em; }
+      #timeSlider { width: 250px; }
+      .controls { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Interactive Patient Diary Visualization</h1>
+
+    <div class="viz-container">
+      <svg width="1200" height="600"></svg>
+      <div class="tooltip"></div>
+
+      <div class="controls">
+        <input type="range" id="timeSlider" min="0" max="1440" value="0" step="30">
+        <span id="timeLabel">Time: </span>
+        <button id="playButton">|> Play</button>
+      </div>
+
+      <div class="time-info">
+        <span id="timeRange">Timeline: Loading...</span>
+      </div>
+
+      <div class="stats">
+        <div class="stat-item">
+          <span class="stat-number" id="totalPatients">0</span>
+          <span class="stat-label">Total Patients</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-number" id="activePatients">0</span>
+          <span class="stat-label">Active Patients</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-number" id="currentTime">00:00</span>
+          <span class="stat-label">Current Time</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-number" id="totalNodes">0</span>
+          <span class="stat-label">Active Nodes</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+// =============================================================================
+// CONFIGURATION CONSTANTS
+// =============================================================================
+const CONFIG = {
+  WIDTH: 1200,
+  HEIGHT: 600,
+  TRANSITION_FAST: 300,
+  TRANSITION_NORMAL: 400,
+  TRANSITION_SLOW: 600,
+  FORCE_STRENGTH: 0.15,
+  CHARGE_STRENGTH: -10,
+  COLLISION_RADIUS: 3,
+  SIMULATION_ALPHA: 0.4,
+  NODE_RADIUS_SINGLE: 12,
+  NODE_RADIUS_MULTIPLE: 8,
+  ACTIVITY_ZONE_RADIUS: 60,
+  LABEL_DISTANCE: 30,
+  STEP_SIZE: 30,
+  PLAYBACK_INTERVAL: 1000,
+  DEBOUNCE_DELAY: 50,
+};
+
+// =============================================================================
+// UTILITIES
+// =============================================================================
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+class TimeUtils {
+  /**
+   * Convert HH:MM:SS time string to absolute minutes from study start
+   * Handles midnight crossings properly by detecting day boundaries
+   */
+  static timeStringToMinutes(timeStr) {
+    if (!timeStr || typeof timeStr !== 'string') return 0;
+
+    const parts = timeStr.split(':');
+    if (parts.length < 2) return 0;
+
+    const hours = parseInt(parts[0], 10) || 0;
+    const minutes = parseInt(parts[1], 10) || 0;
+
+    return hours * 60 + minutes;
+  }
+
+  /**
+   * Create a continuous timeline that handles midnight crossings
+   * Assumes data collection might span multiple days with wrap-around
+   */
+  static createContinuousTimeline(timeStrings, assumedStartHour = 4) {
+    const timePoints = timeStrings.map(timeStr => ({
+      original: timeStr,
+      minutesInDay: this.timeStringToMinutes(timeStr)
+    }));
+
+    // Sort by original time string order to preserve data sequence
+    timePoints.sort((a, b) => timeStrings.indexOf(a.original) - timeStrings.indexOf(b.original));
+
+    let currentDay = 0;
+    let lastMinutes = null;
+
+    return timePoints.map((point, index) => {
+      const { minutesInDay, original } = point;
+
+      // Detect day boundary crossing
+      if (lastMinutes !== null) {
+        // If we go from a high value (like 23:30 = 1410) to a low value (like 00:00 = 0)
+        // and the difference is more than 12 hours, we've crossed midnight
+        const timeDiff = minutesInDay - lastMinutes;
+        if (timeDiff < -720) { // More than 12 hours backward = day rollover
+          currentDay++;
+        }
+      }
+
+      lastMinutes = minutesInDay;
+
+      const absoluteMinutes = currentDay * 1440 + minutesInDay;
+
+      return {
+        original,
+        minutesInDay,
+        day: currentDay,
+        absoluteMinutes,
+        displayTime: this.minutesToTimeString(absoluteMinutes)
+      };
+    });
+  }
+
+  /**
+   * Convert absolute minutes back to readable time string
+   * Shows day information for multi-day spans
+   */
+  static minutesToTimeString(absoluteMinutes) {
+    const days = Math.floor(absoluteMinutes / 1440);
+    const remainingMinutes = absoluteMinutes % 1440;
+    const hours = Math.floor(remainingMinutes / 60);
+    const mins = remainingMinutes % 60;
+
+    const timeStr = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+
+    if (days > 0) {
+      return `Day ${days + 1} ${timeStr}`;
+    }
+    return timeStr;
+  }
+
+  /**
+   * Find the most recent activity for a patient at a given time
+   */
+  static findActivityAtTime(timeline, targetTime) {
+    let bestMatch = null;
+    let smallestForwardGap = Infinity;
+
+    // Look for the most recent activity at or before the target time
+    for (const record of timeline) {
+      const timeDiff = targetTime - record.absoluteMinutes;
+
+      if (timeDiff >= 0 && timeDiff < smallestForwardGap) {
+        smallestForwardGap = timeDiff;
+        bestMatch = record;
+      }
+    }
+
+    return bestMatch;
+  }
+}
+
+// =============================================================================
+// DATA PROCESSOR
+// =============================================================================
+
+class DataProcessor {
+  static processCSVData(rawData) {
+    console.log("Processing CSV data:", rawData.length, "records");
+
+    const patients = new Set();
+    const activities = new Set();
+    const patientTimelines = new Map();
+
+    // Group data by patient first
+    rawData.forEach(record => {
+      if (!record.patient || !record.time || !record.activity) return;
+
+      const patientId = parseInt(record.patient);
+      const activityList = record.activity.split(',').map(a => a.trim()).filter(a => a);
+
+      patients.add(patientId);
+      activityList.forEach(activity => activities.add(activity));
+
+      if (!patientTimelines.has(patientId)) {
+        patientTimelines.set(patientId, []);
+      }
+
+      patientTimelines.get(patientId).push({
+        time: record.time,
+        activities: activityList
+      });
+    });
+
+    //console.log(`Found ${patients.size} patients with ${activities.size} unique activities`);
+
+    // Process each patient's timeline to handle midnight crossings
+    const processedPatientTimelines = new Map();
+    let globalMinTime = Infinity;
+    let globalMaxTime = -Infinity;
+
+    patientTimelines.forEach((timeline, patientId) => {
+      // Create continuous timeline for this patient
+      const timeStrings = timeline.map(t => t.time);
+      const continuousTimeline = TimeUtils.createContinuousTimeline(timeStrings);
+
+      // Merge with activity data
+      const processedTimeline = timeline.map((record, index) => {
+        const timeInfo = continuousTimeline[index];
+        return {
+          absoluteMinutes: timeInfo.absoluteMinutes,
+          day: timeInfo.day,
+          originalTime: record.time,
+          displayTime: timeInfo.displayTime,
+          activities: record.activities
+        };
+      });
+
+      // Track global time bounds
+      processedTimeline.forEach(record => {
+        globalMinTime = Math.min(globalMinTime, record.absoluteMinutes);
+        globalMaxTime = Math.max(globalMaxTime, record.absoluteMinutes);
+      });
+
+      processedPatientTimelines.set(patientId, processedTimeline);
+
+      //console.log(`Patient ${patientId}: ${processedTimeline.length} records from ${processedTimeline[0].displayTime} to ${processedTimeline[processedTimeline.length-1].displayTime}`);
+    });
+
+    // Create visualization timeline
+    const timeStep = CONFIG.STEP_SIZE;
+    const visualizationTimePoints = [];
+
+    for (let time = globalMinTime; time <= globalMaxTime; time += timeStep) {
+      visualizationTimePoints.push(time);
+    }
+
+    console.log(`Global timeline: ${TimeUtils.minutesToTimeString(globalMinTime)} to ${TimeUtils.minutesToTimeString(globalMaxTime)}`);
+    console.log(`Visualization time points: ${visualizationTimePoints.length}`);
+
+    return {
+      patients: Array.from(patients),
+      activities: Array.from(activities),
+      timePoints: visualizationTimePoints,
+      patientTimelines: processedPatientTimelines,
+      globalMinTime,
+      globalMaxTime
+    };
+  }
+}
+
+// =============================================================================
+// NODE CLASS
+// =============================================================================
+
+class SubNode {
+  constructor(parentNode, activity, position) {
+    this.id = `${parentNode.id}_${activity}`;
+    this.parentNode = parentNode;
+    this.activity = activity;
+    this.patientColor = parentNode.patientColor;
+
+    // Visual properties
+    this.x = position.x;
+    this.y = position.y;
+    this.r = CONFIG.NODE_RADIUS_MULTIPLE;
+    this.opacity = 1;
+    this.vx = 0;
+    this.vy = 0;
+
+    // Force targets
+    const cluster = parentNode.activityClusters.get(activity);
+    this.targetX = cluster ? cluster.centerX : position.x;
+    this.targetY = cluster ? cluster.centerY : position.y;
+
+    // State
+    this.isActive = true;
+    this.isMerging = false;
+  }
+
+  updateTarget() {
+    const cluster = this.parentNode.activityClusters.get(this.activity);
+    if (cluster) {
+      this.targetX = cluster.centerX;
+      this.targetY = cluster.centerY;
+    }
+  }
+
+  getStrokeColor() {
+    const cluster = this.parentNode.activityClusters.get(this.activity);
+    return cluster ? cluster.color : "#999";
+  }
+
+  startMerging(targetPosition) {
+    this.isMerging = true;
+    this.targetX = targetPosition.x;
+    this.targetY = targetPosition.y;
+  }
+}
+
+class Node {
+  constructor(patientId, timeline, activityClusters, patientColor) {
+    this.patientId = patientId;
+    this.timeline = timeline; // Already processed with absolute times
+    this.activityClusters = activityClusters;
+    this.patientColor = patientColor;
+
+    // Determine patient's active time window
+    if (timeline.length === 0) {
+      this.startTime = 0;
+      this.endTime = 0;
+    } else {
+      this.startTime = timeline[0].absoluteMinutes;
+      this.endTime = timeline[timeline.length - 1].absoluteMinutes;
+    }
+
+    // Sub-nodes and splits
+    this.subNodes = [];
+    this.numberOfSplits = 0;
+
+    // Activities at each timestamp
+    this.currentActivities = [];
+    this.previousActivities = [];
+
+    // State tracking over time
+    this.isActive = false;
+    this.isWithinLifetime = false;
+
+    // Core position for splitting/merging operations
+    this.corePosition = { x: 600, y: 300 };
+
+    this.id = `node_${patientId}`;
+  }
+
+  getActivitiesAtTime(currentTime) {
+    const record = TimeUtils.findActivityAtTime(this.timeline, currentTime);
+    return record ? record.activities : [];
+  }
+
+  updateCorePosition() {
+    const activeSubNodes = this.subNodes.filter(sn => sn.isActive && !sn.isMerging);
+    if (activeSubNodes.length > 0) {
+      this.corePosition.x = activeSubNodes.reduce((sum, sn) => sum + sn.x, 0) / activeSubNodes.length;
+      this.corePosition.y = activeSubNodes.reduce((sum, sn) => sum + sn.y, 0) / activeSubNodes.length;
+    }
+  }
+
+  getConnectionLines() {
+    const connectionLines = [];
+    const activeSubNodes = this.subNodes.filter(sn => sn.isActive && !sn.isMerging);
+
+    if (activeSubNodes.length > 1) {
+      for (let i = 0; i < activeSubNodes.length - 1; i++) {
+        for (let j = i + 1; j < activeSubNodes.length; j++) {
+          connectionLines.push({
+            source: activeSubNodes[i],
+            target: activeSubNodes[j],
+            patientId: this.patientId
+          });
+        }
+      }
+    }
+
+    return connectionLines;
+  }
+}
+
+// =============================================================================
+// NODE MNGR
+// =============================================================================
+
+class NodeManager {
+  constructor(activityClusters) {
+    this.nodes = new Map();
+    this.activityClusters = activityClusters;
+  }
+
+  createNode(patientId, timeline, patientColor) {
+    const node = new Node(patientId, timeline, this.activityClusters, patientColor);
+    this.nodes.set(patientId, node);
+    return node;
+  }
+
+  updateForTime(currentTime, isJump) {
+    this.nodes.forEach(node => {
+      if (isJump) {
+        this.reconstructNodeState(node, currentTime); // Data-driven
+      } else {
+        this.UpdateNode(node, currentTime); // Sequential flow
+      }
+    });
+  }
+
+  reconstructNodeState(node, currentTime) {
+    // Check if patient should be active at this time
+    const isWithinLifetime = (currentTime >= node.startTime && currentTime <= node.endTime);
+    node.isWithinLifetime = isWithinLifetime;
+
+    if (!node.isWithinLifetime) {
+      node.isActive = false;
+      node.subNodes = [];
+      node.numberOfSplits = 0;
+      return;
+    }
+
+    const activities = node.getActivitiesAtTime(currentTime);
+    if (activities.length === 0) {
+      node.isActive = false;
+      node.subNodes = [];
+      node.numberOfSplits = 0;
+      return;
+    }
+
+    // Reconstruct state directly
+    node.isActive = true;
+    node.currentActivities = activities;
+    node.numberOfSplits = activities.length;
+
+    // Clear and recreate sub-nodes
+    node.subNodes = [];
+
+    if (activities.length === 1) {
+      const cluster = this.activityClusters.get(activities[0]);
+      const subNode = new SubNode(node, activities[0], {
+        x: cluster.centerX,
+        y: cluster.centerY
+      });
+      subNode.r = CONFIG.NODE_RADIUS_SINGLE;
+      node.subNodes.push(subNode);
+    } else {
+      activities.forEach(activity => {
+        const cluster = this.activityClusters.get(activity);
+        const subNode = new SubNode(node, activity, {
+          x: cluster.centerX,
+          y: cluster.centerY
+        });
+        subNode.r = CONFIG.NODE_RADIUS_MULTIPLE;
+        node.subNodes.push(subNode);
+      });
+    }
+  }
+
+  UpdateNode(node, currentTime) {
+    const wasWithinLifetime = node.isWithinLifetime;
+    const isWithinLifetime = (currentTime >= node.startTime && currentTime <= node.endTime);
+    node.isWithinLifetime = isWithinLifetime;
+
+    if (!wasWithinLifetime && isWithinLifetime) {
+      this.reconstructNodeState(node, currentTime);
+      return;
+    }
+
+    if (!node.isWithinLifetime) {
+      this.handleNodeDeactivation(node);
+      return;
+    }
+
+    node.previousActivities = [...node.currentActivities];
+    node.currentActivities = node.getActivitiesAtTime(currentTime);
+
+    if (node.currentActivities.length === 0) {
+      this.handleNodeDeactivation(node);
+      return;
+    }
+
+    node.isActive = true;
+    node.updateCorePosition(); // Step
+
+    const wasMultiple = node.previousActivities.length > 1;
+    const isMultiple = node.currentActivities.length > 1;
+
+    if (!wasMultiple && !isMultiple) {
+      this.handleSingleToSingle(node);
+    } else if (!wasMultiple && isMultiple) {
+      this.handleSplit(node);
+    } else if (wasMultiple && !isMultiple) {
+      this.handleMerge(node);
+    } else {
+      this.handleMultipleToMultiple(node);
+    }
+
+    node.numberOfSplits = node.subNodes.filter(sn => sn.isActive).length;
+  }
+
+  handleNodeDeactivation(node) {
+    node.isActive = false;
+    node.subNodes.forEach(subNode => {
+      subNode.isActive = false;
+      subNode.opacity = 0;
+    });
+    node.subNodes = [];
+    node.numberOfSplits = 0;
+  }
+
+  handleSingleToSingle(node) {
+    const newActivity = node.currentActivities[0];
+    const oldActivity = node.previousActivities[0];
+
+    if (newActivity === oldActivity) return;
+
+    if (node.subNodes.length > 0) {
+      const subNode = node.subNodes[0];
+      subNode.activity = newActivity;
+      subNode.updateTarget();
+      subNode.id = `${node.id}_${newActivity}`;
+    } else {
+      const cluster = this.activityClusters.get(newActivity);
+      const subNode = new SubNode(node, newActivity, node.corePosition);
+      subNode.r = CONFIG.NODE_RADIUS_SINGLE;
+      node.subNodes.push(subNode);
+    }
+  }
+
+  handleSplit(node) {
+    const splitOrigin = node.subNodes.length > 0 ?
+      { x: node.subNodes[0].x, y: node.subNodes[0].y } :
+      node.corePosition;
+
+    node.subNodes = [];
+
+    node.currentActivities.forEach(activity => {
+      const subNode = new SubNode(node, activity, splitOrigin);
+      subNode.r = CONFIG.NODE_RADIUS_MULTIPLE;
+      node.subNodes.push(subNode);
+    });
+  }
+
+  handleMerge(node) {
+    const targetActivity = node.currentActivities[0];
+    const targetCluster = this.activityClusters.get(targetActivity);
+
+    let survivorNode = node.subNodes.find(sn => sn.activity === targetActivity && sn.isActive);
+
+    if (!survivorNode) {
+      survivorNode = node.subNodes.find(sn => sn.isActive);
+    }
+
+    if (survivorNode) {
+      survivorNode.activity = targetActivity;
+      survivorNode.r = CONFIG.NODE_RADIUS_SINGLE;
+      survivorNode.targetX = targetCluster.centerX;
+      survivorNode.targetY = targetCluster.centerY;
+      survivorNode.isActive = true;
+      survivorNode.isMerging = false;
+      survivorNode.id = `${node.id}_${targetActivity}`;
+
+      node.subNodes.forEach(subNode => {
+        if (subNode !== survivorNode && subNode.isActive) {
+          subNode.startMerging({ x: survivorNode.x, y: survivorNode.y });
+          subNode.isActive = false;
+        }
+      });
+
+      node.subNodes = [survivorNode];
+    } else {
+      const mergeTarget = { x: targetCluster.centerX, y: targetCluster.centerY };
+      const singleSubNode = new SubNode(node, targetActivity, mergeTarget);
+      singleSubNode.r = CONFIG.NODE_RADIUS_SINGLE;
+      singleSubNode.isActive = true;
+
+      node.subNodes.forEach(sn => sn.isActive = false);
+      node.subNodes = [singleSubNode];
+    }
+  }
+
+  handleMultipleToMultiple(node) {
+    const toRemove = node.previousActivities.filter(a => !node.currentActivities.includes(a));
+    const toAdd = node.currentActivities.filter(a => !node.previousActivities.includes(a));
+
+    node.subNodes = node.subNodes.filter(subNode => {
+      if (toRemove.includes(subNode.activity)) {
+        subNode.isActive = false;
+        subNode.opacity = 0;
+        return false;
+      }
+      return true;
+    });
+
+    toAdd.forEach(activity => {
+      const subNode = new SubNode(node, activity, node.corePosition);
+      subNode.r = CONFIG.NODE_RADIUS_MULTIPLE;
+      node.subNodes.push(subNode);
+    });
+  }
+
+  getAllSubNodes() {
+    const allSubNodes = [];
+    this.nodes.forEach(node => {
+      allSubNodes.push(...node.subNodes.filter(sn => sn.isActive || sn.isMerging));
+    });
+    return allSubNodes;
+  }
+
+  getAllConnectionLines() {
+    const allLines = [];
+    this.nodes.forEach(node => {
+      if (node.isActive) {
+        allLines.push(...node.getConnectionLines());
+      }
+    });
+    return allLines;
+  }
+
+  getActiveNodes() {
+    return Array.from(this.nodes.values()).filter(node => node.isActive);
+  }
+}
+
+// =============================================================================
+// SIMULATION CTRL
+// =============================================================================
+
+class SimulationController {
+  constructor() {
+    this.simulation = d3.forceSimulation([])
+      .force("charge", d3.forceManyBody().strength(CONFIG.CHARGE_STRENGTH))
+      .force("collide", d3.forceCollide(d => d.r + CONFIG.COLLISION_RADIUS).iterations(2));
+
+    this.currentTickHandler = null;
+  }
+
+  updateSimulation(allSubNodes) {
+    const simulationNodes = allSubNodes.filter(sn => sn.isActive || sn.isMerging);
+
+    this.simulation
+      .force("x", d3.forceX(d => d.targetX).strength(CONFIG.FORCE_STRENGTH))
+      .force("y", d3.forceY(d => d.targetY).strength(CONFIG.FORCE_STRENGTH))
+      .force("collide", d3.forceCollide(d => d.r + CONFIG.COLLISION_RADIUS).iterations(2))
+      .force("charge", d3.forceManyBody().strength(CONFIG.CHARGE_STRENGTH));
+
+    this.simulation.nodes(simulationNodes);
+    this.simulation.alpha(CONFIG.SIMULATION_ALPHA).restart();
+  }
+
+  onTickCallback(callback) {
+    if (this.currentTickHandler) {
+      this.simulation.on("tick", null);
+    }
+    this.currentTickHandler = callback;
+    this.simulation.on("tick", callback);
+  }
+
+  stop() {
+    this.simulation.stop();
+    if (this.currentTickHandler) {
+      this.simulation.on("tick", null);
+      this.currentTickHandler = null;
+    }
+  }
+}
+
+// =============================================================================
+// TIMELINE NAVIGATOR
+// =============================================================================
+class TimelineNavigator {
+  constructor(timePoints, onTimeChange, globalMinTime, globalMaxTime) {
+    this.timePoints = timePoints;
+    this.onTimeChange = onTimeChange;
+    this.globalMinTime = globalMinTime;
+    this.globalMaxTime = globalMaxTime;
+    this.currentTime = timePoints[0] || globalMinTime;
+    this.isPlaying = false;
+    this.playInterval = null;
+    this.stepSize = CONFIG.STEP_SIZE;
+
+    this.debouncedTimeChange = debounce((time) => {
+      this.onTimeChange(time, true);
+    }, CONFIG.DEBOUNCE_DELAY);
+
+    this.initializeControls();
+    this.updateTimeRangeDisplay();
+  }
+
+  initializeControls() {
+    d3.select("#timeSlider")
+      .attr("min", this.globalMinTime)
+      .attr("max", this.globalMaxTime)
+      .attr("step", this.stepSize)
+      .property("value", this.currentTime)
+      .on("input", (event) => {
+        const newTime = +event.target.value;
+        this.currentTime = newTime;
+        this.updateTimeDisplay();
+        this.debouncedTimeChange(newTime);
+      });
+
+    d3.select("#playButton").on("click", () => this.togglePlay());
+  }
+
+  updateTimeRangeDisplay() {
+    const startTime = TimeUtils.minutesToTimeString(this.globalMinTime);
+    const endTime = TimeUtils.minutesToTimeString(this.globalMaxTime);
+    const duration = this.globalMaxTime - this.globalMinTime;
+    const days = Math.floor(duration / 1440);
+    const hours = Math.floor((duration % 1440) / 60);
+
+    let durationText = "";
+    if (days > 0) {
+      durationText = `${days} day${days > 1 ? 's' : ''} ${hours}h`;
+    } else {
+      durationText = `${hours}h ${duration % 60}m`;
+    }
+
+    d3.select("#timeRange").text(`Timeline: ${startTime} to ${endTime} (${durationText})`);
+  }
+
+  jumpToTime(newTime) {
+    this.currentTime = newTime;
+    this.updateTimeDisplay();
+    this.onTimeChange(newTime, true);
+  }
+
+  stepForward() {
+    if (this.currentTime >= this.globalMaxTime) {
+      this.currentTime = this.globalMinTime;
+    } else {
+      this.currentTime = Math.min(this.globalMaxTime, this.currentTime + this.stepSize);
+    }
+    this.updateTimeDisplay();
+    this.onTimeChange(this.currentTime, false);
+  }
+
+  stepBackward() {
+    if (this.currentTime <= this.globalMinTime) {
+      this.currentTime = this.globalMaxTime;
+    } else {
+      this.currentTime = Math.max(this.globalMinTime, this.currentTime - this.stepSize);
+    }
+    this.updateTimeDisplay();
+    this.onTimeChange(this.currentTime, false);
+  }
+
+  togglePlay() {
+    this.isPlaying = !this.isPlaying;
+    d3.select("#playButton").text(this.isPlaying ? "|| Pause" : "|> Play");
+
+    if (this.isPlaying) {
+      this.playInterval = setInterval(() => this.stepForward(), CONFIG.PLAYBACK_INTERVAL);
+    } else {
+      clearInterval(this.playInterval);
+      this.playInterval = null;
+    }
+  }
+
+  updateTimeDisplay() {
+    const timeString = TimeUtils.minutesToTimeString(this.currentTime);
+    d3.select("#timeLabel").text("Time: " + timeString);
+    d3.select("#currentTime").text(timeString);
+    d3.select("#timeSlider").property("value", this.currentTime);
+  }
+
+  cleanup() {
+    if (this.playInterval) {
+      clearInterval(this.playInterval);
+      this.playInterval = null;
+    }
+  }
+}
+
+// =============================================================================
+// ACTIVITY CLUSTER
+// =============================================================================
+
+class ActivityCluster {
+  constructor(activity, position, color) {
+    this.activity = activity;
+    this.centerX = position.x;
+    this.centerY = position.y;
+    this.color = color;
+    this.nodeCount = 0;
+    this.radius = CONFIG.ACTIVITY_ZONE_RADIUS;
+  }
+
+  updateCount(count) {
+    this.nodeCount = count;
+  }
+
+  render(svg) {
+    const safeActivity = this.activity.replace(/[^a-zA-Z0-9]/g, '_');
+
+    svg.select(`.activity-zone-${safeActivity}`)
+      .transition()
+      .duration(CONFIG.TRANSITION_FAST)
+      .attr("fill-opacity", this.nodeCount === 0 ? 0.05 : 0.15)
+      .attr("stroke-opacity", this.nodeCount === 0 ? 0.1 : 0.4);
+
+    svg.select(`.activity-label-${safeActivity}`)
+      .transition()
+      .duration(CONFIG.TRANSITION_FAST)
+      .style("opacity", this.nodeCount === 0 ? 0.3 : 1);
+
+    svg.select(`.activity-count-${safeActivity}`)
+      .text(this.nodeCount)
+      .transition()
+      .duration(CONFIG.TRANSITION_FAST)
+      .style("opacity", this.nodeCount === 0 ? 0.3 : 1);
+  }
+}
+
+// =============================================================================
+// MAIN VISUALIZATION CTRL
+// =============================================================================
+
+class VisualizationController {
+  constructor(svgElement) {
+    this.svg = d3.select(svgElement);
+    this.width = 1200;
+    this.height = 600;
+    this.centerX = this.width / 2;
+    this.centerY = this.height / 2;
+
+    this.nodeManager = null;
+    this.simulationController = new SimulationController();
+    this.timelineNavigator = null;
+    this.activityClusters = new Map();
+    this.processedData = null;
+
+    this.initializeTooltip();
+    this.setupSimulationCallback();
+  }
+
+  initialize(csvData) {
+    this.processedData = DataProcessor.processCSVData(csvData);
+
+    if (this.processedData.activities.length === 0 || this.processedData.patients.length === 0) {
+      this.showError("No valid data found");
+      return;
+    }
+
+    this.createActivityClusters();
+    this.nodeManager = new NodeManager(this.activityClusters);
+    this.createNodes();
+    this.renderStaticElements();
+    this.initializeTimelineNavigator();
+
+    const startTime = this.processedData.globalMinTime;
+    this.updateVisualization(startTime, true);
+
+    console.log("Robust visualization initialized successfully");
+    console.log(`Patients: ${this.processedData.patients.length}, Activities: ${this.processedData.activities.length}`);
+    console.log(`Timeline: ${TimeUtils.minutesToTimeString(this.processedData.globalMinTime)} to ${TimeUtils.minutesToTimeString(this.processedData.globalMaxTime)}`);
+  }
+
+  createActivityClusters() {
+    const activities = this.processedData.activities;
+    const radius = Math.min(250, (Math.min(this.width, this.height) / 2) - 120);
+
+	const baseColors = d3.schemeTableau10;
+	const activityColors = d3.scaleOrdinal()
+	  .domain(activities)
+	  .range(activities.map((_, i) => {
+		if (i < baseColors.length) return baseColors[i];
+		const hue = (i * 137.5) % 360;
+		const saturation = 50 + 20 * Math.sin(i * 0.5);
+		const lightness  = 50 + 10 * Math.cos(i * 0.5);
+		return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+	  }));
+
+    activities.forEach((activity, i) => {
+      const angle = (i / activities.length) * 2 * Math.PI - Math.PI / 2;
+      const position = {
+        x: this.centerX + radius * Math.cos(angle),
+        y: this.centerY + radius * Math.sin(angle)
+      };
+      const cluster = new ActivityCluster(activity, position, activityColors(activity));
+      this.activityClusters.set(activity, cluster);
+    });
+  }
+
+  createNodes() {
+	const baseColors = d3.schemeTableau10;
+	const patientColors = d3.scaleOrdinal()
+	  .domain(this.processedData.patients)
+	  .range(this.processedData.patients.map((_, i) => {
+		if (i < baseColors.length) return baseColors[i];
+		const hue = (i * 137.5) % 360;
+		const saturation = 50 + 25 * Math.sin(i * 0.5);
+		const lightness  = 50 + 25 * Math.cos(i * 0.5);
+		return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+	  }));
+
+    this.processedData.patients.forEach(patientId => {
+      const timeline = this.processedData.patientTimelines.get(patientId) || [];
+      const color = patientColors(patientId);
+      this.nodeManager.createNode(patientId, timeline, color);
+    });
+  }
+
+  renderStaticElements() {
+    this.svg.selectAll("*").remove();
+
+    this.activityClusters.forEach((cluster, activity) => {
+      const safeActivity = activity.replace(/[^a-zA-Z0-9]/g, '_');
+
+      this.svg.append("circle")
+        .attr("class", `activity-zone-${safeActivity}`)
+        .attr("cx", cluster.centerX)
+        .attr("cy", cluster.centerY)
+        .attr("r", cluster.radius)
+        .attr("fill", cluster.color)
+        .attr("fill-opacity", 0.1)
+        .attr("stroke", cluster.color)
+        .attr("stroke-width", 2)
+        .attr("stroke-opacity", 0.3);
+
+      const labelDistance = CONFIG.LABEL_DISTANCE;
+      const angle = Math.atan2(cluster.centerY - this.centerY, cluster.centerX - this.centerX);
+      const labelX = this.centerX + (250 + labelDistance) * Math.cos(angle);
+      const labelY = this.centerY + (250 + labelDistance) * Math.sin(angle);
+
+      this.svg.append("text")
+        .attr("class", `activity-label-${safeActivity}`)
+        .attr("x", labelX)
+        .attr("y", labelY)
+        .attr("text-anchor", "middle")
+        .attr("alignment-baseline", "middle")
+        .style("fill", cluster.color)
+        .text(activity);
+
+      this.svg.append("text")
+        .attr("class", `activity-count-${safeActivity}`)
+        .attr("x", labelX)
+        .attr("y", labelY + 15)
+        .attr("text-anchor", "middle")
+        .attr("alignment-baseline", "middle")
+        .style("fill", cluster.color)
+        .text("0");
+    });
+  }
+
+  initializeTimelineNavigator() {
+    this.timelineNavigator = new TimelineNavigator(
+      this.processedData.timePoints,
+      (time, isJump) => this.updateVisualization(time, isJump),
+      this.processedData.globalMinTime,
+      this.processedData.globalMaxTime
+    );
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        this.timelineNavigator.stepBackward();
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        this.timelineNavigator.stepForward();
+      } else if (event.key === ' ') {
+        event.preventDefault();
+        this.timelineNavigator.togglePlay();
+      }
+    });
+  }
+
+  updateVisualization(currentTime, isJump) {
+    this.nodeManager.updateForTime(currentTime, isJump);
+
+    const allSubNodes = this.nodeManager.getAllSubNodes();
+    const allConnectionLines = this.nodeManager.getAllConnectionLines();
+
+    this.updateActivityCounts();
+    this.renderSubNodes(allSubNodes);
+    this.renderConnectionLines(allConnectionLines);
+    this.simulationController.updateSimulation(allSubNodes);
+    this.updateStatistics();
+  }
+
+  updateActivityCounts() {
+    const activityCounts = new Map();
+    this.activityClusters.forEach((cluster, activity) => {
+      activityCounts.set(activity, 0);
+    });
+
+    this.nodeManager.nodes.forEach(node => {
+      if (node.isActive) {
+        node.currentActivities.forEach(activity => {
+          const current = activityCounts.get(activity) || 0;
+          activityCounts.set(activity, current + 1);
+        });
+      }
+    });
+
+    this.activityClusters.forEach((cluster, activity) => {
+      cluster.updateCount(activityCounts.get(activity) || 0);
+      cluster.render(this.svg);
+    });
+  }
+
+  renderSubNodes(allSubNodes) {
+    const nodeSelection = this.svg.selectAll(".sub-node")
+      .data(allSubNodes, d => d.id);
+
+    nodeSelection.exit()
+      .transition()
+      .duration(CONFIG.TRANSITION_NORMAL)
+      .attr("r", 0)
+      .attr("opacity", 0)
+      .remove();
+
+    const newNodes = nodeSelection.enter()
+      .append("circle")
+      .attr("class", "sub-node")
+      .attr("cx", d => d.x)
+      .attr("cy", d => d.y)
+      .attr("r", 0)
+      .attr("fill", d => d.patientColor)
+      .attr("stroke", d => d.getStrokeColor())
+      .attr("stroke-width", 2)
+      .attr("opacity", 0)
+      .style("cursor", "pointer")
+      .style("filter", "drop-shadow(0 2px 4px rgba(0,0,0,0.15))");
+
+    newNodes
+      .transition()
+      .duration(CONFIG.TRANSITION_NORMAL)
+      .ease(d3.easeCubicOut)
+      .attr("r", d => d.r)
+      .attr("opacity", d => d.opacity);
+
+    newNodes.on("mouseover", (event, d) => {
+      d3.select(".tooltip").style("display", "block")
+        .html(`<strong>Patient ${d.parentNode.patientId}</strong><br/>Activity: ${d.activity}`)
+        .style("left", (event.pageX + 15) + "px")
+        .style("top", (event.pageY - 10) + "px");
+    }).on("mouseout", () => {
+      d3.select(".tooltip").style("display", "none");
+    });
+
+    const allNodes = nodeSelection.merge(newNodes);
+    allNodes
+      .transition()
+      .duration(CONFIG.TRANSITION_FAST)
+      .attr("r", d => d.r)
+      .attr("opacity", d => d.opacity)
+      .attr("stroke", d => d.getStrokeColor());
+
+    allNodes
+      .filter(d => d.isMerging)
+      .transition()
+      .duration(CONFIG.TRANSITION_SLOW)
+      .attr("cx", d => d.targetX)
+      .attr("cy", d => d.targetY)
+      .on("end", (event, d) => {
+        d3.select(event.target)
+          .transition()
+          .duration(200)
+          .attr("r", 0)
+          .attr("opacity", 0)
+          .on("end", () => {
+            const parentNode = d.parentNode;
+            parentNode.subNodes = parentNode.subNodes.filter(sn => sn !== d);
+          });
+      });
+  }
+
+  renderConnectionLines(connectionLines) {
+    const lineSelection = this.svg.selectAll(".connection-line")
+      .data(connectionLines, d => `${d.source.id}_${d.target.id}`);
+
+    lineSelection.exit()
+      .transition()
+      .duration(CONFIG.TRANSITION_FAST)
+      .attr("stroke-opacity", 0)
+      .remove();
+
+    const newLines = lineSelection.enter()
+      .append("line")
+      .attr("class", "connection-line")
+      .attr("stroke", "#bdc3c7")
+      .attr("stroke-width", 1)
+      .attr("stroke-opacity", 0)
+      .attr("stroke-dasharray", "2,2");
+
+    lineSelection.merge(newLines)
+      .transition()
+      .duration(CONFIG.TRANSITION_FAST)
+      .attr("stroke-opacity", 0.3);
+  }
+
+  setupSimulationCallback() {
+    this.simulationController.onTickCallback(() => {
+      this.svg.selectAll(".sub-node")
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y);
+
+      this.svg.selectAll(".connection-line")
+        .attr("x1", d => d.source.x)
+        .attr("y1", d => d.source.y)
+        .attr("x2", d => d.target.x)
+        .attr("y2", d => d.target.y);
+    });
+  }
+
+  updateStatistics() {
+    const activeNodes = this.nodeManager.getActiveNodes();
+    const totalSubNodes = this.nodeManager.getAllSubNodes().length;
+
+    d3.select("#totalPatients").text(this.processedData.patients.length);
+    d3.select("#activePatients").text(activeNodes.length);
+    d3.select("#totalNodes").text(totalSubNodes);
+  }
+
+  initializeTooltip() {
+    d3.select(".tooltip").style("display", "none");
+  }
+
+  showError(message) {
+    this.svg.selectAll("*").remove();
+    this.svg.append("text")
+      .attr("x", this.width / 2)
+      .attr("y", this.height / 2)
+      .attr("text-anchor", "middle")
+      .attr("fill", "#e74c3c")
+      .attr("font-size", "18px")
+      .text(message);
+  }
+
+  cleanup() {
+    if (this.timelineNavigator) {
+      this.timelineNavigator.cleanup();
+    }
+    if (this.simulationController) {
+      this.simulationController.stop();
+    }
+  }
+}
+
+// =============================================================================
+// INITIALIZATION
+// =============================================================================
+
+const visualization = new VisualizationController("svg");
+
+d3.csv("/P1_data/patient_diary.csv").then(data => {
+  if (data && data.length > 0) {
+    console.log("Loaded CSV data:", data.length, "records");
+    visualization.initialize(data);
+  } else {
+    console.error("No data loaded from CSV");
+    visualization.showError("CSV file loaded but contains no data");
+  }
+}).catch(error => {
+  console.log("Could not load CSV file:", error);
+  visualization.showError("Could not load patient_diary.csv - make sure file is in same directory and served from a web server");
+});
+
+window.addEventListener('beforeunload', () => {
+  visualization.cleanup();
+});
+</script>
+</body>
+</html>

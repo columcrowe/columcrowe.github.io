@@ -14,16 +14,18 @@
     background: var(--bg);
   }
   #themeToggle:hover {
-   .sun { fill: black; }
+   .sun { fill: var(--accent); }
+   .moon { fill: transparent; }
   }
   :global(.dark) #themeToggle:hover {
-   .moon { fill: white; }
+   .moon { fill: var(--accent); }
+   .sun { fill: transparent; }
   }
-  .sun { fill: var(--link); }
+  .sun { fill: var(--text); }
   .moon { fill: transparent; }
 
   :global(.dark) .sun { fill: transparent; }
-  :global(.dark) .moon { fill: var(--link); }
+  :global(.dark) .moon { fill: var(--text); }
 </style>
 
 <script is:inline>
